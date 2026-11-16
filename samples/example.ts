@@ -1,0 +1,1 @@
+interface Producto{id:number;nombre:string;precio:number}const productos:Producto[]=[{id:1,nombre:"Teclado",precio:49.9}];function total(items:Producto[]):number{return items.reduce((suma,item)=>suma+item.precio,0)}console.log(total(productos))

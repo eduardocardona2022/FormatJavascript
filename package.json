@@ -1,0 +1,46 @@
+{
+  "name": "formatjavascript",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicación web para formatear archivos JavaScript, TypeScript y otros lenguajes con Prettier.",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:api": "npm run dev -w @formatjs/api",
+    "dev:web": "npm run dev -w @formatjs/web",
+    "build": "npm run build -w @formatjs/api && npm run build -w @formatjs/web",
+    "start": "node scripts/start-prod.mjs",
+    "test": "npm run test -w @formatjs/shared && npm run test -w @formatjs/api && npm run test -w @formatjs/web",
+    "test:coverage": "npm run test:coverage -w @formatjs/shared && npm run test:coverage -w @formatjs/api && npm run test:coverage -w @formatjs/web",
+    "typecheck": "npm run typecheck -w @formatjs/shared && npm run typecheck -w @formatjs/api && npm run typecheck -w @formatjs/web",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "audit": "npm audit --audit-level=high",
+    "clean": "node scripts/clean.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.15.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.8",
+    "globals": "^17.14.0",
+    "prettier": "^3.10.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  },
+  "overrides": {
+    "minimatch": "^11.0.8"
+  }
+}
