@@ -23,6 +23,12 @@ describe('configuración de entorno', () => {
     expect(loadConfig({ TRUST_PROXY: 'false' }).trustProxy).toBe(false);
   });
 
+  it('confía en el proxy de Vercel por defecto', () => {
+    expect(loadConfig({ VERCEL: '1' }).trustProxy).toBe(true);
+    expect(loadConfig({ VERCEL: '1', TRUST_PROXY: 'false' }).trustProxy).toBe(false);
+    expect(loadConfig({ NODE_ENV: 'test' }).trustProxy).toBe(false);
+  });
+
   it('rechaza variables inválidas', () => {
     expect(() => loadConfig({ PORT: 'abc' })).toThrow(/Configuración de entorno inválida/);
     expect(() => loadConfig({ NODE_ENV: 'staging' })).toThrow(/Configuración de entorno inválida/);

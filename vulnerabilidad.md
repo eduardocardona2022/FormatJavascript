@@ -1,8 +1,10 @@
 # Análisis de vulnerabilidades — FormatJavascript
 
-**Fecha:** 2026-11-16  
-**Alcance:** aplicación web local FormatJavascript (frontend React, API Fastify, pool de Prettier).  
+**Fecha:** 2026-11-16<br />
+**Alcance:** aplicación web FormatJavascript (frontend React, API Fastify, pool de Prettier).<br />
 **Versión auditada:** 1.0.0.
+
+> **Despliegue en Vercel:** consulta la sección correspondiente del [README](./README.md). En Vercel, TLS lo termina la plataforma, los estáticos se sirven desde su CDN y `/api/*` se ejecuta como una función serverless. La aplicación sigue sin autenticación: para un despliegue privado, usa Vercel Deployment Protection o añade autenticación. El rate limiting en memoria pasa a ser por instancia.
 
 ---
 
@@ -16,7 +18,7 @@
 | Vulnerabilidades bajas               | 0                    |
 | Dependencias de producción auditadas | 177                  |
 | Dependencias totales auditadas       | 555                  |
-| Pruebas automatizadas                | 141                  |
+| Pruebas automatizadas                | 152                  |
 
 `npm audit` y `npm audit --omit=dev` finalizan sin vulnerabilidades conocidas en la fecha indicada.
 
@@ -81,9 +83,9 @@ Antes de la corrección se detectaron **7 vulnerabilidades moderadas**, todas en
 | Severidad | Baja en el alcance local; alta si se expone públicamente |
 | Estado    | **Aceptada / documentada**                               |
 
-La aplicación no tiene login ni autorización. Está pensada para ejecutarse en `127.0.0.1`. El servidor escucha en localhost por defecto y no guarda código. Si se publica en una red, cualquier cliente podría formatear código y consumir CPU.
+La aplicación no tiene login ni autorización. En local está pensada para ejecutarse en `127.0.0.1`: el servidor escucha en localhost por defecto y no guarda código. Si se publica en una red, cualquier cliente podría formatear código y consumir CPU. En Vercel, la función es pública salvo que se active Deployment Protection; TLS y el encaminamiento los gestiona la plataforma, pero la aplicación sigue sin autenticación.
 
-**Mitigación:** mantener `HOST=127.0.0.1`; para exposición pública, añadir autenticación, TLS y proxy inverso con límites de red.
+**Mitigación:** en local, mantener `HOST=127.0.0.1`; para exposición pública, añadir autenticación y límites de red. En Vercel, usar Deployment Protection o autenticación adicional y una regla de rate limiting en Vercel Firewall.
 
 ### VULN-03 — `style-src 'unsafe-inline'` en la CSP (aceptada)
 

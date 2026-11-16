@@ -12,10 +12,7 @@ const envSchema = z.object({
   FORMAT_TIMEOUT_MS: z.coerce.number().int().min(100).max(60_000).default(5_000),
   FORMATTER_MAX_THREADS: z.coerce.number().int().min(1).max(16).default(2),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
-  TRUST_PROXY: z
-    .enum(['true', 'false'])
-    .default('false')
-    .transform((value) => value === 'true'),
+  TRUST_PROXY: z.enum(['true', 'false']).optional(),
   WEB_DIST_PATH: z.string().min(1).optional(),
 });
 
@@ -60,6 +57,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
 
   const data = parsed.data;
+  const isVercel = env.VERCEL === '1' || env.VERCEL === 'true';
 
   return {
     nodeEnv: data.NODE_ENV,
@@ -71,7 +69,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     formatTimeoutMs: data.FORMAT_TIMEOUT_MS,
     formatterMaxThreads: data.FORMATTER_MAX_THREADS,
     logLevel: data.LOG_LEVEL,
-    trustProxy: data.TRUST_PROXY,
+    // Vercel termina TLS en su proxy y reenvía la IP del cliente en
+    // X-Forwarded-For. Sin confiar en el proxy, el rate limiting agruparía a
+    // todos los visitantes bajo la misma IP.
+    trustProxy: data.TRUST_PROXY !== undefined ? data.TRUST_PROXY === 'true' : isVercel,
     ...(data.WEB_DIST_PATH ? { webDistPath: data.WEB_DIST_PATH } : {}),
   };
 }

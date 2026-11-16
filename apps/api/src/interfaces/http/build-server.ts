@@ -17,6 +17,11 @@ export interface ServerDependencies {
 export interface BuildServerOptions {
   readonly config: AppConfig;
   readonly dependencies: ServerDependencies;
+  /**
+   * Sirve el build del frontend desde Fastify. En Vercel los archivos estáticos
+   * los entrega el CDN y esta opción se desactiva.
+   */
+  readonly serveStatic?: boolean;
 }
 
 function buildContentSecurityPolicy() {
@@ -48,6 +53,7 @@ function buildContentSecurityPolicy() {
 export async function buildServer({
   config,
   dependencies,
+  serveStatic,
 }: BuildServerOptions): Promise<FastifyInstance> {
   const app = Fastify({
     logger:
@@ -80,9 +86,10 @@ export async function buildServer({
     config,
   });
 
-  const webDist = config.nodeEnv === 'production' ? resolveWebDistPath(config) : undefined;
+  const shouldServeStatic = serveStatic ?? config.nodeEnv === 'production';
+  const webDist = shouldServeStatic ? resolveWebDistPath(config) : undefined;
 
-  if (config.nodeEnv === 'production' && !webDist) {
+  if (shouldServeStatic && config.nodeEnv === 'production' && !webDist) {
     app.log.warn(
       'No se encontró el build del frontend. Ejecuta "npm run build" antes de iniciar producción.',
     );

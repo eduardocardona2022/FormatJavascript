@@ -10,7 +10,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       include: ['src/**/*.ts'],
-      exclude: ['src/main/**'],
+      exclude: ['src/main/**', 'src/serverless.ts'],
       thresholds: {
         statements: 75,
         branches: 70,

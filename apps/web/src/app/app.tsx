@@ -15,7 +15,7 @@ export function App() {
           </main>
           <footer className="border-t">
             <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:px-6 lg:px-8">
-              <p>FormatJavascript · Formateo local con Prettier</p>
+              <p>FormatJavascript · Formateo con Prettier</p>
               <p>React · Fastify · Clean Architecture</p>
             </div>
           </footer>

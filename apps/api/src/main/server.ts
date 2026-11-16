@@ -1,17 +1,10 @@
-import { FormatSourceUseCase } from '../application/use-cases/format-source.use-case';
-import { loadConfig, loadEnvFiles } from '../infrastructure/config/env';
-import { PrettierFormatter } from '../infrastructure/formatter/prettier.formatter';
-import { buildServer } from '../interfaces/http/build-server';
+import { createApplication } from './app';
+import { loadEnvFiles } from '../infrastructure/config/env';
 
 async function main(): Promise<void> {
   loadEnvFiles();
-  const config = loadConfig();
-  const formatter = new PrettierFormatter({
-    maxThreads: config.formatterMaxThreads,
-    timeoutMs: config.formatTimeoutMs,
-  });
-  const formatSource = new FormatSourceUseCase(formatter);
-  const app = await buildServer({ config, dependencies: { formatSource } });
+  const runtime = await createApplication();
+  const { app, config } = runtime;
 
   let shuttingDown = false;
 
@@ -22,8 +15,7 @@ async function main(): Promise<void> {
 
     shuttingDown = true;
     app.log.info({ signal }, 'Cerrando servidor');
-    await app.close();
-    await formatter.close();
+    await runtime.close();
   };
 
   process.once('SIGINT', () => {
@@ -37,7 +29,7 @@ async function main(): Promise<void> {
     await app.listen({ host: config.host, port: config.port });
   } catch (error) {
     app.log.error({ err: error }, 'No se pudo iniciar el servidor');
-    await formatter.close();
+    await runtime.close();
     process.exitCode = 1;
   }
 }

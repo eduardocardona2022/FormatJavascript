@@ -1,6 +1,6 @@
 # FormatJavascript
 
-Aplicación web local para cargar, formatear y exportar código JavaScript, TypeScript, JSX/TSX, JSON, CSS, HTML y Markdown con [Prettier](https://prettier.io/).
+Aplicación web para cargar, formatear y exportar código JavaScript, TypeScript, JSX/TSX, JSON, CSS, HTML y Markdown con [Prettier](https://prettier.io/).
 
 La interfaz sigue el lenguaje visual de **shadcn/ui** y el backend aplica **Clean Architecture**, principios SOLID y separación estricta de responsabilidades.
 
@@ -10,7 +10,7 @@ La interfaz sigue el lenguaje visual de **shadcn/ui** y el backend aplica **Clea
 
 - Carga de archivos `.js`, `.jsx`, `.ts`, `.tsx`, `.json`, `.css`, `.html` y `.md`.
 - También permite pegar código y elegir el lenguaje manualmente.
-- Formateo con Prettier en el backend, aislado en un pool de workers.
+- Formateo con Prettier en el backend: pool de workers en local y ejecución en proceso en Vercel.
 - Opciones configurables: ancho de línea, indentación, comillas, punto y coma, comas finales, tabs, fin de línea y ajuste de prosa.
 - Resultado con resaltado de sintaxis, copia al portapapeles y descarga con el nombre original (`app.ts` → `app.formatted.ts`).
 - Errores de sintaxis con línea y columna cuando el parser las proporciona.
@@ -22,16 +22,16 @@ La interfaz sigue el lenguaje visual de **shadcn/ui** y el backend aplica **Clea
 
 ## Stack
 
-| Capa         | Tecnología                                              |
-| ------------ | ------------------------------------------------------- |
-| Frontend     | React 19, TypeScript, Vite 8, Tailwind CSS 4, shadcn/ui |
-| Editor       | CodeMirror 6 (carga diferida por lenguaje)              |
-| Backend      | Node.js 22, TypeScript, Fastify 5                       |
-| Formateador  | Prettier 3 en `worker_threads` con Piscina              |
-| Contratos    | Zod 4 + paquete compartido `@formatjs/shared`           |
-| Pruebas      | Vitest 5, Testing Library, `fastify.inject`             |
-| Calidad      | ESLint 10, TypeScript `strict`, Prettier                |
-| Persistencia | No aplica                                               |
+| Capa         | Tecnología                                                               |
+| ------------ | ------------------------------------------------------------------------ |
+| Frontend     | React 19, TypeScript, Vite 8, Tailwind CSS 4, shadcn/ui                  |
+| Editor       | CodeMirror 6 (carga diferida por lenguaje)                               |
+| Backend      | Node.js 22, TypeScript, Fastify 5                                        |
+| Formateador  | Prettier 3 en `worker_threads` con Piscina (local) o standalone (Vercel) |
+| Contratos    | Zod 4 + paquete compartido `@formatjs/shared`                            |
+| Pruebas      | Vitest 5, Testing Library, `fastify.inject`                              |
+| Calidad      | ESLint 10, TypeScript `strict`, Prettier                                 |
+| Persistencia | No aplica                                                                |
 
 ---
 
@@ -89,9 +89,10 @@ FormatJavascript/
 │  │  │  ├─ application/use-cases/format-source.use-case.ts
 │  │  │  ├─ infrastructure/
 │  │  │  │  ├─ config/env.ts
-│  │  │  │  └─ formatter/{prettier.formatter.ts,formatter.worker.mjs}
+│  │  │  │  └─ formatter/{prettier.formatter.ts,prettier-inline.formatter.ts,prettier-options.ts,formatter.worker.mjs}
 │  │  │  ├─ interfaces/http/{build-server.ts,error-handler.ts,routes/*}
-│  │  │  └─ main/server.ts
+│  │  │  ├─ main/{app.ts,server.ts}
+│  │  │  └─ serverless.ts             # Entrada de la función de Vercel
 │  │  └─ test/
 │  └─ web/
 │     └─ src/
@@ -103,12 +104,14 @@ FormatJavascript/
 │        │  └─ presentation/*.tsx
 │        ├─ lib/{api-client.ts,clipboard.ts,format.ts,utils.ts}
 │        └─ test/
+├─ api/server.mjs                   # Función serverless que monta Fastify
 ├─ packages/shared/
 │  └─ src/{languages.ts,schemas.ts}
 ├─ scripts/{dev.mjs,start-prod.mjs,wait-ready.mjs,stop.mjs,clean.mjs}
 ├─ samples/
 ├─ init.bat
 ├─ clean.bat
+├─ vercel.json
 ├─ vulnerabilidad.md
 └─ README.md
 ```
@@ -291,7 +294,7 @@ Resumen de controles:
 
 - Validación estricta con Zod y rechazo de campos desconocidos.
 - Límite de 1 MiB, `bodyLimit` de Fastify y rate limiting por IP.
-- Prettier no ejecuta el código; se ejecuta en workers con timeout.
+- Prettier no ejecuta el código; se ejecuta con timeout (workers en local, en proceso en Vercel).
 - Sin escritura en disco y sin registrar el código fuente en logs.
 - Nombres de archivo saneados; el servidor rechaza rutas.
 - React escapa el contenido y Markdown se muestra como código, nunca como HTML.
@@ -317,9 +320,9 @@ Cobertura actual:
 | Paquete   | Pruebas | Statements | Branches | Functions | Lines  |
 | --------- | ------- | ---------- | -------- | --------- | ------ |
 | `shared`  | 26      | 98.0 %     | 93.8 %   | 91.7 %    | 98.0 % |
-| `api`     | 68      | 93.7 %     | 90.5 %   | 95.2 %    | 94.1 % |
+| `api`     | 79      | 88.8 %     | 78.0 %   | 94.2 %    | 89.5 % |
 | `web`     | 47      | 79.3 %     | 66.8 %   | 74.4 %    | 79.2 % |
-| **Total** | **141** | -          | -        | -         | -      |
+| **Total** | **152** | -          | -        | -         | -      |
 
 Los umbrales están configurados en cada `vitest.config.ts` y el comando falla si no se cumplen.
 
@@ -327,7 +330,7 @@ Las pruebas incluyen:
 
 - Dominio y value objects (`SourceFile`, `ResolvedFormatOptions`).
 - Caso de uso con formateador fake.
-- Integración real con Prettier para los ocho lenguajes, errores de sintaxis, timeout y worker roto.
+- Integración real con Prettier (Piscina y adaptador serverless) para los ocho lenguajes, errores de sintaxis, timeout y worker roto.
 - Rutas HTTP con `fastify.inject`: éxito, 400, 413, 415, 422, 429, 503, 504 y 500.
 - Servidor de producción: CSP, caché de assets, fallback SPA y 404 de API.
 - Frontend: cliente API, portapapeles, hook `useFormatter`, dropzone, opciones, editor y página completa.
@@ -338,19 +341,81 @@ Las pruebas incluyen:
 
 Copia `.env.example` a `.env` en la raíz si necesitas cambiar los valores:
 
-| Variable                | Default       | Descripción                                                    |
-| ----------------------- | ------------- | -------------------------------------------------------------- |
-| `NODE_ENV`              | `development` | `development`, `test` o `production`.                          |
-| `HOST`                  | `127.0.0.1`   | Interfaz de escucha. Usa `0.0.0.0` solo si sabes lo que haces. |
-| `PORT`                  | `3000`        | Puerto de la API.                                              |
-| `MAX_SOURCE_BYTES`      | `1048576`     | Límite de entrada en bytes (1 MiB).                            |
-| `RATE_LIMIT_MAX`        | `120`         | Peticiones por ventana.                                        |
-| `RATE_LIMIT_WINDOW`     | `1 minute`    | Ventana de rate limiting.                                      |
-| `FORMAT_TIMEOUT_MS`     | `5000`        | Timeout por formateo.                                          |
-| `FORMATTER_MAX_THREADS` | `2`           | Hilos del pool de Prettier.                                    |
-| `LOG_LEVEL`             | `info`        | Nivel de logs de Fastify/Pino.                                 |
-| `TRUST_PROXY`           | `false`       | Confiar en `X-Forwarded-*` detrás de un proxy.                 |
-| `WEB_DIST_PATH`         | —             | Ruta explícita al build del frontend.                          |
+| Variable                | Default       | Descripción                                                               |
+| ----------------------- | ------------- | ------------------------------------------------------------------------- |
+| `NODE_ENV`              | `development` | `development`, `test` o `production`. Vercel lo define como `production`. |
+| `HOST`                  | `127.0.0.1`   | Interfaz de escucha. Usa `0.0.0.0` solo si sabes lo que haces.            |
+| `PORT`                  | `3000`        | Puerto de la API. Vercel gestiona el puerto en serverless.                |
+| `MAX_SOURCE_BYTES`      | `1048576`     | Límite de entrada en bytes (1 MiB).                                       |
+| `RATE_LIMIT_MAX`        | `120`         | Peticiones por ventana. En Vercel el límite es por instancia.             |
+| `RATE_LIMIT_WINDOW`     | `1 minute`    | Ventana de rate limiting.                                                 |
+| `FORMAT_TIMEOUT_MS`     | `5000`        | Timeout por formateo.                                                     |
+| `FORMATTER_MAX_THREADS` | `2`           | Hilos del pool de Prettier. No aplica en Vercel.                          |
+| `LOG_LEVEL`             | `info`        | Nivel de logs de Fastify/Pino.                                            |
+| `TRUST_PROXY`           | `false`       | Confiar en `X-Forwarded-*`. En Vercel se activa automáticamente.          |
+| `WEB_DIST_PATH`         | —             | Ruta explícita al build del frontend. No definir en Vercel.               |
+
+---
+
+## Despliegue en Vercel
+
+El repositorio incluye una configuración para desplegar frontend y backend en **un único proyecto de Vercel**:
+
+- El build de Vite (`apps/web/dist`) se publica en el CDN.
+- `/api/*` se enruta a una única función serverless (`api/server.mjs`) que monta Fastify.
+- Frontend y API comparten dominio, así que no hace falta CORS ni configurar `VITE_API_BASE`.
+
+### Desde el panel
+
+1. Sube el repositorio a GitHub, GitLab o Bitbucket.
+2. Importa el proyecto en [vercel.com/new](https://vercel.com/new).
+3. Usa el **directorio raíz del repositorio**, sin seleccionar `apps/web` ni `apps/api`.
+4. Framework Preset: **Other**. `vercel.json` ya define el build, la salida y las rewrites.
+5. No definas `WEB_DIST_PATH`.
+6. Pulsa **Deploy**.
+
+### Desde la CLI
+
+```bash
+npm i -g vercel
+vercel
+vercel --prod
+```
+
+### Variables de entorno
+
+Ninguna es obligatoria. En Vercel:
+
+- `NODE_ENV=production` lo define la plataforma.
+- `TRUST_PROXY` se activa solo (`VERCEL=1`) para que el rate limiting use la IP real del cliente.
+- `FORMATTER_MAX_THREADS` no se usa.
+- `WEB_DIST_PATH` debe quedar sin definir.
+
+Puedes ajustar `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW`, `FORMAT_TIMEOUT_MS`, `MAX_SOURCE_BYTES` y `LOG_LEVEL` en **Project Settings → Environment Variables**.
+
+### Qué cambia en Vercel
+
+| Local / servidor propio       | Vercel                                  |
+| ----------------------------- | --------------------------------------- |
+| Prettier en Piscina (workers) | Prettier standalone en la misma función |
+| Fastify sirve `apps/web/dist` | El CDN de Vercel sirve los estáticos    |
+| Rate limit global del proceso | Rate limit por instancia de función     |
+| Timeout cancela el worker     | Timeout cooperativo: corta la respuesta |
+| `HOST` y `PORT` configurables | La plataforma gestiona el puerto        |
+
+El límite de 1 MiB de la aplicación sigue activo. Vercel además limita cada petición a 4,5 MB y la función a 30 s (`maxDuration` en `vercel.json`).
+
+El rate limit en memoria no es global entre instancias. Si necesitas un límite por IP a nivel de plataforma, añade una regla en **Vercel Firewall → Rate Limiting**.
+
+Comprueba el despliegue con:
+
+```bash
+curl https://tu-proyecto.vercel.app/api/health
+```
+
+> La configuración usa `api/server.mjs` + `vercel.json` y no depende de la detección automática de Fastify ni de Vercel Services (beta).
+
+La aplicación no incluye autenticación por diseño. Si el despliegue debe ser privado, activa **Vercel Deployment Protection** o añade autenticación delante del proyecto.
 
 ---
 
@@ -390,7 +455,11 @@ Ejecuta `npm run dev` en una terminal y abre `http://127.0.0.1:5173`. El script 
 
 **Error de versión de Node**
 
-Instala Node 22.12 o superior. Vite 8 y las versiones actuales de las dependencias lo requieren.
+Instala Node 22.12 o superior. Vite 8 y las versiones actuales de las dependencias lo requieren. Vercel usa la versión declarada en `engines` (`22.x`).
+
+**En Vercel `/api/health` responde 404**
+
+Comprueba que el **Root Directory** del proyecto es la raíz del repositorio y que `vercel.json` se desplegó. El build debe generar `apps/api/dist/serverless.js` y Vercel debe detectar la función `api/server.mjs`; revisa los logs del build y de la función.
 
 **Windows bloquea la instalación de esbuild**
 
@@ -402,7 +471,7 @@ npm install-scripts approve esbuild
 
 **El formateo tarda en la primera petición**
 
-El pool de Piscina arranca un worker bajo demanda. Las peticiones posteriores son más rápidas.
+En local, el pool de Piscina arranca un worker bajo demanda. En Vercel, la primera invocación incluye el cold start de la función. Las peticiones posteriores son más rápidas.
 
 **CSP bloquea algún recurso**
 
@@ -415,7 +484,7 @@ La CSP permite `style-src 'unsafe-inline'` porque CodeMirror inyecta estilos. No
 - **Backend para Prettier:** cumple el stack solicitado y evita cargar el parser completo en el navegador.
 - **Workers:** Prettier es CPU-bound; aislarlo protege el event loop de Fastify.
 - **Contratos compartidos:** el mismo esquema Zod valida la entrada y la respuesta.
-- **Sin base de datos:** no hay estado que persistir; el código vive en memoria del navegador y del worker.
+- **Sin base de datos:** no hay estado que persistir; el código vive en memoria del navegador y del proceso de la API.
 - **CodeMirror diferido:** el editor pesado se carga en un chunk separado y los lenguajes se importan bajo demanda.
 - **Mismo origen en producción:** Fastify sirve el build del frontend y evita CORS.
 - **Sin vista previa de Markdown:** se muestra como código para no introducir XSS por HTML generado.

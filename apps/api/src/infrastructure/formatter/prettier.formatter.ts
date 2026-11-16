@@ -1,6 +1,5 @@
 import { fileURLToPath } from 'node:url';
 import Piscina from 'piscina';
-import type { FormatOptions, LanguageId } from '@formatjs/shared';
 import {
   FormatSyntaxError,
   FormatTimeoutError,
@@ -11,6 +10,7 @@ import type {
   CodeFormatResult,
   CodeFormatterPort,
 } from '../../domain/ports/code-formatter.port';
+import { PARSER_BY_LANGUAGE, toPrettierOptions } from './prettier-options';
 
 interface WorkerSuccess {
   ok: true;
@@ -35,24 +35,6 @@ interface PrettierFormatterOptions {
   /** Permite inyectar el worker en pruebas sin depender de la ruta del build. */
   readonly filename?: string;
 }
-
-const PARSER_BY_LANGUAGE = {
-  javascript: 'babel',
-  'javascript-jsx': 'babel',
-  typescript: 'typescript',
-  'typescript-tsx': 'typescript',
-  json: 'json',
-  css: 'css',
-  html: 'html',
-  markdown: 'markdown',
-} as const satisfies Record<LanguageId, string>;
-
-const SCRIPT_LANGUAGES = new Set<LanguageId>([
-  'javascript',
-  'javascript-jsx',
-  'typescript',
-  'typescript-tsx',
-]);
 
 /**
  * Adaptador de infraestructura. Prettier es CPU-bound y síncrono, por lo que
@@ -124,34 +106,4 @@ export class PrettierFormatter implements CodeFormatterPort {
   async close(): Promise<void> {
     await this.pool.destroy();
   }
-}
-
-/**
- * Solo se envían las opciones que cada lenguaje soporta. No se hace spread del
- * objeto recibido para evitar propiedades no deseadas (prototype pollution).
- */
-function toPrettierOptions(language: LanguageId, options: FormatOptions): Record<string, unknown> {
-  const common = {
-    printWidth: options.printWidth,
-    tabWidth: options.tabWidth,
-    useTabs: options.useTabs,
-    endOfLine: options.endOfLine,
-  };
-
-  if (SCRIPT_LANGUAGES.has(language)) {
-    return {
-      ...common,
-      semi: options.semi,
-      singleQuote: options.singleQuote,
-      trailingComma: options.trailingComma,
-      bracketSpacing: options.bracketSpacing,
-      arrowParens: options.arrowParens,
-    };
-  }
-
-  if (language === 'markdown') {
-    return { ...common, proseWrap: options.proseWrap };
-  }
-
-  return common;
 }

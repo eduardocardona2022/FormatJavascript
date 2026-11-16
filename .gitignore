@@ -3,6 +3,7 @@ dist/
 coverage/
 .vite/
 .run/
+.vercel/
 .env
 .env.*
 !.env.example
